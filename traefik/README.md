@@ -36,6 +36,7 @@ The following values must be changed to personal needs:
 - If you use Client-Cerificates store your public Client-CA Certificate in `data/client-ca.crt`
   - `chmod 600 acme.json`
 - Create Docker Network `docker network create proxy`
+- start Traefik `docker-compose up -d`
       
 ## Knows Issues
 - Hairpin NAT 
