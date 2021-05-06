@@ -1,0 +1,11 @@
+# Domain
+# All services will end with this domain e.g.: "traefik.example.com" 
+DOMAIN=example.com
+# Dashboard Authentication
+# - generate Hash with: echo $(htpasswd -nb USER PASSWORD) 
+#   e.g. USER:$apr1$UqPkD90p$3DQK8mciHWGt9hFegtOsM/
+TD_USER_AUTH=YOUR-CREDENTIAL-HASH
+# Netcup Credentials
+NC_CUSTOMER_NUMBER=YOUR-NETCUP_CUSTOMER_NUMBER
+NC_API_KEY=YOUR-NETCUP-API-KEY
+NC_API_PASSWORD=YOUR-NETCUP-API-PASSWORD
