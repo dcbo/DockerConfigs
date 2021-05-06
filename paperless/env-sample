@@ -1,6 +1,10 @@
+#########################################
+# This is a Sample-Environment-File
+# copy it to .env and change settings 
+#########################################
 # Paperless
 PL_URL=paperless.example.com
-PL_SECRET_KEY=mBBWEkrZRNyKD5WZTZg7JZ7uR2r3jXTApmD3Xb5epFYvp
+PL_SECRET_KEY=change-to-a-looooooong-random-key-eg-mBBWEkrZRNyKD5WZTZg7JZ7uR2r3jXTApmD3Xb5epFYvp
 # Postgres
 PG_DB=paperless
 PG_USER=paperless
