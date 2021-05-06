@@ -1,0 +1,7 @@
+# Paperless
+PL_URL=paperless.example.com
+PL_SECRET_KEY=mBBWEkrZRNyKD5WZTZg7JZ7uR2r3jXTApmD3Xb5epFYvp
+# Postgres
+PG_DB=paperless
+PG_USER=paperless
+PG_PASSWORD=paperless
