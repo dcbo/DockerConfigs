@@ -1,0 +1,46 @@
+log:
+  # DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+  level: INFO
+
+api:
+  dashboard: true
+
+entryPoints:
+  # Global redirect to https
+  http:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: https
+          scheme: https  
+  https:
+    address: ":443"
+  mqtt:
+    address: ":1883"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+  file:
+    filename: "/dynamic_conf.yml"
+
+certificatesResolvers:
+  dns:
+    acme:
+      email: email_for_letsencrypt@example.com
+      storage: acme.json
+      keyType: RSA4096
+      # Production 
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      # Staging
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      dnschallenge: 
+        provider: netcup
+        delaybeforecheck: 600
+        resolvers: 
+        - root-dns.netcup.net:53
+        - second-dns.netcup.net:53        
+        - 8.8.8.8:53        
+        - 1.1.1.1:53        
