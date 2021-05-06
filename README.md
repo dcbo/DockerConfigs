@@ -11,18 +11,10 @@ My personal Docker Configuration
 - Document management
 
 ## ToDo
-### Portainer
-- Docker Gui
-### CA
-- CA for creating Client-Certificates
-### Dokuwiki
-- internal Dokumentation
-### Duplikati
-- Backup
-### IoT
-- NodeRed
-- InfluxDb
-- MQTT
+### Portainer (Docker Gui)
+### CA (creating Client-Certificates)
+### Dokuwiki (Internal Dokumentation)
+### Duplikati (Backup)
+### IoT (NodeRed, InfluxDb, MQTT-Broker)
 ### Nextcloud
-### Samba
-- internal Fileserver
+### Samba (internal Fileserver)
