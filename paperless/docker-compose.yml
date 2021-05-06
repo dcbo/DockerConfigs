@@ -1,0 +1,119 @@
+# docker-compose file for running paperless 
+# (c) Dario Carluccio 2021 
+#
+# - Persistant Data is stored in Sub-Directories from the same directory 
+# - PostgreSQL is used as the database server.
+# - Apache Tika and Gotenberg servers are started with paperless and paperless
+#   is configured to use these services. These provide support for consuming
+#   Office documents (Word, Excel, Power Point and their LibreOffice counter-
+#   parts.
+#
+# To install paperless with this file, do the following:
+# - Copy this file as 'docker-compose.yml' into a folder.
+# - Create Data Directories
+#   - ./data    - Papeless Data & Logfiles   
+#   - ./media   - Papeless Document Storage  
+#   - ./pgdata  - PostgreSQL Database
+#   - ./consume - Papeless Consuption Directory 
+#   - ./export  - Papeless Export Directory 
+# - copy env-sample to .env and edit to match your needs
+# - Run 'docker-compose pull'
+# - Run 'docker-compose run --rm webserver createsuperuser' to create a user.
+# - Run 'docker-compose up -d'.
+#
+# Backup
+# - We use export instead of backup.
+#   - Export includes all Data(PDF)-Files and 
+#   - Manifest-File with all Metadata
+#   - to recover the Export can be imported to a new instance
+# - to run Export:
+#   - 'docker-compose run --rm webserver document_exporter /export'
+#   - this is done by paperless-backup.sh
+#   - start daily with users crontab ('crontab -e')
+#   - ./export then has to be backed up once a day witcg your favorite Backup-Solution
+version: "3.4"
+services:
+
+  broker:
+    image: redis:6.0
+    restart: unless-stopped
+    networks:
+      - intern
+
+  db:
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    networks:
+      - intern
+
+  webserver:
+    image: jonaswinkler/paperless-ng:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./data:/usr/src/paperless/data
+      - ./media:/usr/src/paperless/media
+      - ./export:/usr/src/paperless/export
+      - ./consume:/usr/src/paperless/consume
+      - ./export:/export
+    labels:      
+      - "traefik.enable=true"
+      
+      - "traefik.docker.network=proxy"
+      # Router "paperless-secure": https://PAPERLESS_URL] -> paperless-Dashboard
+      - "traefik.http.routers.paperless-secure.entrypoints=https"
+      - "traefik.http.routers.paperless-secure.rule=Host(`${PL_URL}`)"      
+      # Middlewares: Access only from local IP & Set HTTP Security Headers
+      - "traefik.http.routers.paperless-secure.middlewares=onlyLocal@file,secHeaders@file"      
+      - "traefik.http.routers.paperless-secure.tls=true"
+      # Service      
+      - "traefik.http.routers.paperless-secure.service=paperless"
+      - "traefik.http.services.paperless.loadbalancer.server.port=8000"
+      # --------------------------------------------------------    
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_OCR_LANGUAGE: deu
+      PAPERLESS_SECRET_KEY: ${PL_SECRET_KEY}      
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+    networks:
+      - proxy
+      - intern
+    
+  gotenberg:
+    image: thecodingmachine/gotenberg
+    restart: unless-stopped
+    environment:
+      DISABLE_GOOGLE_CHROME: 1
+    networks:
+    - intern
+
+  tika:
+    image: apache/tika
+    restart: unless-stopped
+    networks:
+      - intern
+
+networks:
+  proxy:
+    external: true
+  intern:
+    external: false
+   
