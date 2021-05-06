@@ -16,7 +16,7 @@ My personal Docker Configuration
 ### CA
 - CA for creating Client-Certificates
 ### Dokuwiki
-- CA for creating Client-Certificates
+- internal Dokumentation
 ### Duplikati
 - Backup
 ### IoT
