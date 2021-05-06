@@ -1,1 +1,78 @@
-#
+# ---------------------------------------------------------------------------------
+# Traefik - Reverse-Proxy
+# (c) Dario Carluccio 2021
+# ---------------------------------------------------------------------------------
+# - Traefik Dashboard can be accessed with: "https://traefik.DOMAIN"
+# - Services can be accessed with: "[servicename].DOMAIN"
+# ---------------------------------------------------------------------------------
+# Preparation
+# - Set DNS for "DOMAIN"
+#   *.DOMAIN       - IP-Adress or CNAME to your Docker-Host
+# - Traefik requests a Wildcard-Cert using dns-01 Challenge (with NetCup DNS)
+#   - If a Domain is not hostet @ NETCUP set the folowing DNS-CNAME entry:
+#     "_acme-challenge.DOMAIN CNAME acme.validation.NETCUP_HOSTED_DOMAIN"
+#     where
+#     - "DOMAIN"                is a domain hosted from DNS without DNS-API
+#     - "NETCUP_HOSTED_DOMAIN"  is a domain hosted by Netcup-Nameserver with DNS-API
+# ---------------------------------------------------------------------------------
+version: '3'
+services:
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    ports:
+      - 80:80       # http (global redirected)
+      - 443:443     # https 
+      - 1883:1883   # mqtt
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data/traefik.yml:/traefik.yml:ro
+      - ./data/acme.json:/acme.json
+      - ./data/dynamic_conf.yml:/dynamic_conf.yml
+      - ./data/client-ca.crt:/client-ca.crt:ro           # disable if Client Certificates not needed
+    environment:
+      # Netcup DNS Credentials
+      - NETCUP_CUSTOMER_NUMBER=${NC_CUSTOMER_NUMBER}
+      - NETCUP_API_KEY=${NC_API_KEY}
+      - NETCUP_API_PASSWORD=${NC_API_PASSWORD}      
+      - LEGO_EXPERIMENTAL_CNAME_SUPPORT=true
+    labels:
+      - "traefik.enable=true"
+      # --------------------------------------------------------
+      # INCLUDE: dynamic_conf.yml
+      # - redirect@file   -> Redirect to HTTPS
+      # - secHeaders@file -> Set HTTPS-Headers
+      # - onlyLocal@file  -> Allow only local IPS
+      # - TSP-Config      -> default & requestClientCert
+      - "providers.file.filename=/dynamic_conf.yml"
+      # --------------------------------------------------------
+      # Middleware: traefik-auth (https-auth to Traefik Dashboard)      
+      # - if credentail is inserted here generate it with: 
+      #   echo $(htpasswd -nb USER PASSWORD) | sed -e s/\\$/\\$\\$/g
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TD_USER_AUTH}"      
+      # --------------------------------------------------------      
+      # Router "traefik-secure": https://traefik.DOMAIN -> Traefik-Dashboard
+      - "traefik.http.routers.traefik-secure.entrypoints=https"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"      
+      - "traefik.http.routers.traefik-secure.middlewares=onlyLocal@file,traefik-auth,secHeaders@file"
+      - "traefik.http.routers.traefik-secure.tls=true"      
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+      # --------------------------------------------------------
+      # Router "whoami-secure": To get Wildcard-Certs, no Service configured
+      - "traefik.http.routers.whoami-secure.entrypoints=https"
+      - "traefik.http.routers.whoami-secure.service=noop@internal"
+      - "traefik.http.routers.whoami-secure.tls.certResolver=dns"
+      - "traefik.http.routers.whoami-secure.tls.domains[0].main=*.${DOMAIN}"
+      # Enable folowing line, if Cert for "DOMAIN" is also needed.
+      # - "traefik.http.routers.whoami-secure.tls.domains[0].sans=${DOMAIN}"
+      # --------------------------------------------------------
+      
+networks:
+  proxy:
+    external: true
