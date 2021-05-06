@@ -1,3 +1,7 @@
+#########################################
+# This is a Sample-Environment-File
+# copy it to .env and change settings 
+#########################################
 # Domain
 # All services will end with this domain e.g.: "traefik.example.com" 
 DOMAIN=example.com
