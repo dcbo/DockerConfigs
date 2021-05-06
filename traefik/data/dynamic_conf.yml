@@ -1,0 +1,65 @@
+tls:
+  options:
+    # Default Options
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_AES_256_GCM_SHA384
+        - TLS_CHACHA20_POLY1305_SHA256
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+      sniStrict: true      
+
+    # Option: requestClientCert
+    # - Client Certificate is needed
+    requestClientCert:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_AES_256_GCM_SHA384
+        - TLS_CHACHA20_POLY1305_SHA256
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+      sniStrict: true      
+      clientAuth:        
+        caFiles:
+          - /client-ca.crt
+        clientAuthType: RequireAndVerifyClientCert
+
+http:
+  middlewares:    
+    # secHeaders@file
+    # - Set Sameorigin
+    # - Set HSTS
+    # - enforce HTTPS
+    secHeaders:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        sslRedirect: true        
+        #HSTS Configuration
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 15552000                
+    
+    # redirect@file: Redirect HTTP -> HTTPS
+    redirect:
+      redirectScheme:
+        scheme: "https"
+    
+    # onlyLocal@file: Allow only local IPs    
+    onlyLocal:
+      ipWhiteList:
+        sourceRange:
+        # LAN
+        - "192.168.0.1/24"
+        # IOT Devices
+        - "192.168.1.1/24"
+        # Internal Docker Network
+        - "172.16.0.0/12"
