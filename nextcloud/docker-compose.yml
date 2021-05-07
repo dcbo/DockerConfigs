@@ -1,0 +1,175 @@
+# docker-compose file for running Nextcloud
+# (c) Dario Carluccio 2021 
+#
+# - Persistant Data is stored in Sub-Directories from the same directory 
+# - MariaDB is used as the database server.
+
+# To install:
+# - Copy 'docker-compose.yml' into a folder.
+# - Create Data-Directories
+#   - ./app      - Nextcloud APP
+#   - ./data     - Nextcloud Data
+#   - ./database - MariaDB Database
+#   - ./redis    - Redis Data
+# - copy env-sample to .env and edit to match your needs
+# - Run 'docker-compose pull'
+# - Run 'docker-compose up -d'.
+
+# Cron
+# To run the cronjob inside the container use:
+#   docker exec -u www-data nextcloud-app php /var/www/html/cron.php
+#   docker exec -u www-data -d nextcloud-app /usr/local/bin/php -q -f /var/www/html/cron.php > /dev/null 2>&1
+# This can be done by calling start_nextcloud_cron.sh using Crontab on Docker-Host
+#   crontab -e  
+#   add: */10 * * * * /FULL_PATH_ON_HOST/start_nextcloud_cron.sh
+
+# Backup
+# - To Backup
+#   - Dump Database T.B.D
+#   - Backup everything except Database-Folder: ./database 
+
+# Migrate 
+# To migrate from another instance
+# - Activate Maintainance on both server
+#   - set "'maintenance' => false" in "app/config/Config.php"
+# - Backup old database
+#   - mysqldump --default-character-set=utf8mb4 -u [USER] -p'[PASS]' [OldDatabaseName] > database.SQL
+# - If tableprefix in Source DB is "oc_" 
+#   - Delete all "oc_" tables in new Database (using PHP-myadmin)
+# - Import to new database
+#   -docker exec -it nextcloud-db
+#   -mariadb -u nextcloud_user -p -h localhost nextcloud < /import.SQL
+# - Copy Data-Dir 
+#   - rsync-azv [SSH_USER]@example.com:/[PATH_TO_NEXTCLOUD]/data /[LOCATION_OF_DOCKER-COMPOSE]/data-to-migrate
+#   - Adapt Owner of Files in Data-Dir
+#     - docker exec -u www-data nextcloud-app id
+#       returns e.g.: uid=33(www-data) gid=33(www-data) groups=33(www-data)
+#     - sudo chown -R 33:33 /data
+#   - move ./data to ./data-DELETE_ME
+#   - move ./data-to-migrate/data to ./data
+# - If tableprefix in Source DB is NOT "oc_" 
+#   - Edit "config.php"
+#     - 'dbtableprefix' => 'WQ2Ts_',
+# - Disable Maintainance on new server
+#   - set "'maintenance' => true" in "./app/config/Config.php"
+
+version: '3.3'
+services:
+  nextcloud-db:
+    image: mariadb
+    container_name: nextcloud-mariadb        
+    command: --transaction-isolation=READ-COMMITTED --log-bin=ROW
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./database:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${MARIA_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${MARIA_ROOT_PASSWORD}
+      - MYSQL_USER=${MARIA_USER}
+      - MYSQL_PASSWORD=${MARIA_USER_PASS}
+      - MYSQL_INITDB_SKIP_TZINFO=1 
+    networks:
+      - internal
+
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    command: redis-server --requirepass ${REDIS_PASS}    
+    restart: unless-stopped    
+    volumes:
+      - ./redis:/data
+    networks:
+      - internal
+
+  nextcloud-app:
+    image: nextcloud
+    container_name: nextcloud-app
+    restart: unless-stopped
+    networks:
+      - proxy
+      - internal
+    volumes:
+      - ./app:/var/www/html
+      - ./data:/var/www/html/data
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    environment:
+      # default Admin User      
+      - NEXTCLOUD_ADMIN_USER=${NC_ADMIN_USER}      
+      - NEXTCLOUD_ADMIN_PASSWORD=${NC_ADMIN_PASS}
+      # MySQL Connection
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_DATABASE=${MARIA_DATABASE}
+      - MYSQL_USER=${MARIA_USER}
+      - MYSQL_PASSWORD=${MARIA_USER_PASS}
+      # Redis Connection
+      - REDIS_HOST=nextcloud-redis
+      - REDIS_HOST_PASSWORD=${REDIS_PASS}
+      # SMTP Configuration
+      - SMTP_HOST=${MY_SMTP_HOST}
+      - SMTP_SECURE=ssl
+      - SMTP_PORT=${MY_SMTP_PORT}
+      - SMTP_AUTHTYPE=LOGIN
+      - SMTP_NAME=${MY_SMTP_NAME}
+      - SMTP_PASSWORD=${MY_SMTP_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MY_FROM_ADDRESS}
+      - MAIL_DOMAIN=${MY_FROM_DOMAIN}  
+      # Reverese-Proxy Settings
+      - TRUSTED_PROXIES=traefik
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NC_URL}
+      - APACHE_DISABLE_REWRITE_IP=1      
+      # OVERWRITEHOST: Set the hostname of the proxy. Can also specify a port.
+      - OVERWRITEHOST=${NC_URL}
+      # OVERWRITEPROTOCOL: Set the protocol of the proxy, http or https.
+      - OVERWRITEPROTOCOL=https            
+    labels:
+      - "traefik.enable=true"      
+      - "traefik.docker.network=proxy"      
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+      # Router "nextcloud-secure": https://NC_URL] -> Nextcloud
+      - "traefik.http.routers.nextcloud-secure.entrypoints=https"
+      - "traefik.http.routers.nextcloud-secure.rule=Host(`${NC_URL}`)"      
+      - "traefik.http.routers.nextcloud-secure.service=nextcloud"
+      - "traefik.http.routers.nextcloud-secure.tls=true"           
+      # Middlewares: Access only from local IP, Set HTTP Security Headers & Replace ".well-known/ca(l|rd)dav"
+      - "traefik.http.routers.nextcloud-secure.middlewares=onlyLocal@file,secHeaders@file,nextcloud-dav"      
+      # Replace "/.well-known/ca(l|rd)dav" with "/remote.php/dav/"      
+      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.regex=^/.well-known/ca(l|rd)dav"
+      - "traefik.http.middlewares.nextcloud-dav.replacepathregex.replacement=/remote.php/dav/"
+
+#  # Nextcloud News Updater
+#  nc-news-updater:
+#    container_name: nextcloud-news-updater
+#    image: kr3ssh/nextcloud-news-updater
+#    restart: unless-stopped
+#    volumes:
+#      - ./app:/nextcloud
+#    environment:
+#      - NEXTCLOUD_URL=https://${NC_URL}
+#      - NEXTCLOUD_ADMIN_USER=${NEWS_ADMIN_USER}
+#      - NEXTCLOUD_ADMIN_PASSWORD=${NEWS_ADMIN_PASSWORD}
+#    networks:
+#      - proxy
+
+#  # PHPmyAdmin - activate if needed
+#  phpmyadmin:
+#    image: phpmyadmin
+#    restart: unless-stopped
+#    ports:
+#      - 8887:80
+#    networks:
+#      - internal
+#    environment:
+#      - PMA_ARBITRARY=1
+#      - PMA_HOST=nextcloud-db      
+#      - PMA_USER=${MARIA_USER}
+#      - PMA_PASSWORD=${MARIA_USER_PASS}      
+  
+networks:
+  internal:
+    external: false
+  proxy:
+    external: true
