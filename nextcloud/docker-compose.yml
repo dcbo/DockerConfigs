@@ -4,16 +4,19 @@
 # - Persistant Data is stored in Sub-Directories from the same directory 
 # - MariaDB is used as the database server.
 
-# To install:
-# - Copy 'docker-compose.yml' into a folder.
-# - Create Data-Directories
+# To install do the following:
+# - Copy this file as 'docker-compose.yml' into a folder.
+# - Create Data Directories
 #   - ./app      - Nextcloud APP
 #   - ./data     - Nextcloud Data
 #   - ./database - MariaDB Database
 #   - ./redis    - Redis Data
 # - copy env-sample to .env and edit to match your needs
 # - Run 'docker-compose pull'
-# - Run 'docker-compose up -d'.
+# - Run 'docker-compose up -d'
+# - Addtional Steps:
+#   - docker exec -u root nextcloud-app apt-get update
+#   - docker exec -it -u root nextcloud-app apt install libmagickcore-6.q16-6-extra
 
 # Cron
 # To run the cronjob inside the container use:
@@ -21,7 +24,7 @@
 #   docker exec -u www-data -d nextcloud-app /usr/local/bin/php -q -f /var/www/html/cron.php > /dev/null 2>&1
 # This can be done by calling start_nextcloud_cron.sh using Crontab on Docker-Host
 #   crontab -e  
-#   add: */10 * * * * /FULL_PATH_ON_HOST/start_nextcloud_cron.sh
+#   add: */10 * * * * /FULL_PATH_ON_HOST/
 
 # Backup
 # - To Backup
@@ -37,8 +40,7 @@
 # - If tableprefix in Source DB is "oc_" 
 #   - Delete all "oc_" tables in new Database (using PHP-myadmin)
 # - Import to new database
-#   -docker exec -it nextcloud-db
-#   -mariadb -u nextcloud_user -p -h localhost nextcloud < /import.SQL
+#   - docker exec -it nextcloud-db mariadb -u nextcloud_user -p -h localhost nextcloud < /import.SQL
 # - Copy Data-Dir 
 #   - rsync-azv [SSH_USER]@example.com:/[PATH_TO_NEXTCLOUD]/data /[LOCATION_OF_DOCKER-COMPOSE]/data-to-migrate
 #   - Adapt Owner of Files in Data-Dir
@@ -153,6 +155,7 @@ services:
 #      - NEXTCLOUD_ADMIN_PASSWORD=${NEWS_ADMIN_PASSWORD}
 #    networks:
 #      - proxy
+
 
 #  # PHPmyAdmin - activate if needed
 #  phpmyadmin:
