@@ -1,0 +1,26 @@
+############################
+# Nextcloud
+NC_URL=cloud.example.comn
+NC_ADMIN_USER=nextcloudadmin
+NC_ADMIN_PASS=very_secret_long_password_for_nextcloudadmin
+############################
+# Nextcloud News Updater
+NEWS_ADMIN_USER=mynewsupdater
+NEWS_ADMIN_PASSWORD=very_secret_long_password_for_mynewsupdater
+############################
+# MariaDB
+MARIA_DATABASE=nextcloud
+MARIA_USER=nextcloud_user
+MARIA_ROOT_PASSWORD=very_secret_long_database_password_for_root
+MARIA_USER_PASS=very_secret_long_database_password_for_nextcloud_user
+############################
+# Redis
+REDIS_PASS=very_secret_long_redis_password
+############################
+# SMPT-Relay
+MY_SMTP_HOST=smtp.example.com
+MY_SMTP_PORT=465
+MY_SMTP_NAME=relay@example.com
+MY_SMTP_PASSWORD=very_secret_long_smtp_password_for_relay@example.com
+MY_FROM_ADDRESS=cloud
+MY_FROM_DOMAIN=example.com
