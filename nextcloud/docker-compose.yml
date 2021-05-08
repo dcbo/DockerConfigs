@@ -16,20 +16,23 @@
 # - Run 'docker-compose up -d'
 # - Addtional Steps:
 #   - docker exec -u root nextcloud-app apt-get update
-#   - docker exec -it -u root nextcloud-app apt install libmagickcore-6.q16-6-extra
+#   - docker exec -u root nextcloud-app apt-get --assume-yes install libmagickcore-6.q16-6-extra
 
 # Cron
 # To run the cronjob inside the container use:
 #   docker exec -u www-data nextcloud-app php /var/www/html/cron.php
 #   docker exec -u www-data -d nextcloud-app /usr/local/bin/php -q -f /var/www/html/cron.php > /dev/null 2>&1
-# This can be done by calling start_nextcloud_cron.sh using Crontab on Docker-Host
+# This can be done by calling run_nextcloud_cron.sh using Crontab on Docker-Host
 #   crontab -e  
-#   add: */10 * * * * /FULL_PATH_ON_HOST/
+#   add: */5 * * * * /FULL_PATH_ON_HOST/nextcloud_run_cron.sh
 
 # Backup
 # - To Backup
-#   - Dump Database T.B.D
-#   - Backup everything except Database-Folder: ./database 
+#   - Dump Database 
+#     - nextcloud_db_backup.sh 
+#     - (crontab -e)
+#       add: */5 * * * * /FULL_PATH_ON_HOST/nextcloud_db_backup.sh
+#   - Backup everything else except Database-Folder: ./database 
 
 # Migrate 
 # To migrate from another instance
@@ -59,13 +62,15 @@ version: '3.3'
 services:
   nextcloud-db:
     image: mariadb
-    container_name: nextcloud-mariadb        
+    #container_name: nextcloud-mariadb
+    container_name: nextcloud-db
     command: --transaction-isolation=READ-COMMITTED --log-bin=ROW
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - ./database:/var/lib/mysql
+      #- ./database_backup:/database_backup
     environment:
       - MYSQL_DATABASE=${MARIA_DATABASE}
       - MYSQL_ROOT_PASSWORD=${MARIA_ROOT_PASSWORD}
@@ -99,18 +104,18 @@ services:
       - nextcloud-db
       - nextcloud-redis
     environment:
-      # default Admin User      
+      # default Admin User (used to create initail config.php)     
       - NEXTCLOUD_ADMIN_USER=${NC_ADMIN_USER}      
       - NEXTCLOUD_ADMIN_PASSWORD=${NC_ADMIN_PASS}
-      # MySQL Connection
+      # MySQL Connection (used to create initail config.php)
       - MYSQL_HOST=nextcloud-db
       - MYSQL_DATABASE=${MARIA_DATABASE}
       - MYSQL_USER=${MARIA_USER}
       - MYSQL_PASSWORD=${MARIA_USER_PASS}
-      # Redis Connection
+      # Redis Connection (used to create initail config.php)
       - REDIS_HOST=nextcloud-redis
       - REDIS_HOST_PASSWORD=${REDIS_PASS}
-      # SMTP Configuration
+      # SMTP Configuration (overloads config.php)
       - SMTP_HOST=${MY_SMTP_HOST}
       - SMTP_SECURE=ssl
       - SMTP_PORT=${MY_SMTP_PORT}
@@ -119,13 +124,10 @@ services:
       - SMTP_PASSWORD=${MY_SMTP_PASSWORD}
       - MAIL_FROM_ADDRESS=${MY_FROM_ADDRESS}
       - MAIL_DOMAIN=${MY_FROM_DOMAIN}  
-      # Reverese-Proxy Settings
-      - TRUSTED_PROXIES=traefik
-      - NEXTCLOUD_TRUSTED_DOMAINS=${NC_URL}
-      - APACHE_DISABLE_REWRITE_IP=1      
-      # OVERWRITEHOST: Set the hostname of the proxy. Can also specify a port.
-      - OVERWRITEHOST=${NC_URL}
-      # OVERWRITEPROTOCOL: Set the protocol of the proxy, http or https.
+      # Reverese-Proxy Settings (overloads config.php)
+      - TRUSTED_PROXIES=${TRAEFIK_IP}         # IP-ADDRESS of TRAEFIK in DOCKER-"proxy"-Network
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NC_URL}            
+      - OVERWRITEHOST=${NC_URL}      
       - OVERWRITEPROTOCOL=https            
     labels:
       - "traefik.enable=true"      
@@ -136,26 +138,27 @@ services:
       - "traefik.http.routers.nextcloud-secure.rule=Host(`${NC_URL}`)"      
       - "traefik.http.routers.nextcloud-secure.service=nextcloud"
       - "traefik.http.routers.nextcloud-secure.tls=true"           
-      # Middlewares: Access only from local IP, Set HTTP Security Headers & Replace ".well-known/ca(l|rd)dav"
-      - "traefik.http.routers.nextcloud-secure.middlewares=onlyLocal@file,secHeaders@file,nextcloud-dav"      
+      # Middlewares: Set HTTP Security Headers & Replace ".well-known/ca(l|rd)dav"
+      - "traefik.http.routers.nextcloud-secure.middlewares=secHeaders@file,nextcloud-dav"
       # Replace "/.well-known/ca(l|rd)dav" with "/remote.php/dav/"      
       - "traefik.http.middlewares.nextcloud-dav.replacepathregex.regex=^/.well-known/ca(l|rd)dav"
       - "traefik.http.middlewares.nextcloud-dav.replacepathregex.replacement=/remote.php/dav/"
 
-#  # Nextcloud News Updater
-#  nc-news-updater:
-#    container_name: nextcloud-news-updater
-#    image: kr3ssh/nextcloud-news-updater
-#    restart: unless-stopped
-#    volumes:
-#      - ./app:/nextcloud
-#    environment:
-#      - NEXTCLOUD_URL=https://${NC_URL}
-#      - NEXTCLOUD_ADMIN_USER=${NEWS_ADMIN_USER}
-#      - NEXTCLOUD_ADMIN_PASSWORD=${NEWS_ADMIN_PASSWORD}
-#    networks:
-#      - proxy
-
+  # Nextcloud News Updater
+  nextcloud-news-updater:
+    image: kr3ssh/nextcloud-news-updater
+    container_name: nextcloud-news-updater    
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-app
+    volumes:
+      - ./app:/nextcloud
+    environment:
+      - NEXTCLOUD_URL=https://${NC_URL}
+      - NEXTCLOUD_ADMIN_USER=${NEWS_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEWS_ADMIN_PASSWORD}
+    networks:
+      - proxy
 
 #  # PHPmyAdmin - activate if needed
 #  phpmyadmin:
